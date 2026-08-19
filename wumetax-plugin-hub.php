@@ -54,6 +54,16 @@ final class Wumetax_Plugin_Hub {
         return $catalog;
     }
 
+    private function get_latest_release($repo) {
+        $key = 'wumetax_release_' . md5($repo);
+        $cached = get_transient($key);
+        if ($cached !== false) return $cached;
+        $response = wp_remote_get('https://api.github.com/repos/' . $repo . '/releases/latest', array('timeout' => 10, 'headers' => array('Accept' => 'application/vnd.github+json')));
+        $release = !is_wp_error($response) ? json_decode(wp_remote_retrieve_body($response), true) : array();
+        set_transient($key, $release, 5 * MINUTE_IN_SECONDS);
+        return $release;
+    }
+
     public function install_plugin() {
         if (!current_user_can('install_plugins')) wp_die('權限不足');
         check_admin_referer('wumetax_hub_install');
@@ -76,8 +86,8 @@ final class Wumetax_Plugin_Hub {
             <p>由 Wumetax LTD 開發與維護。每個功能皆為可獨立安裝、啟用與更新的 WordPress 外掛。</p>
             <p><a class="button button-primary" href="<?php echo esc_url(admin_url('plugin-install.php?tab=upload')); ?>">上傳並安裝 Wumetax 外掛</a> <a class="button" href="https://wumetax.com/contact-us/" target="_blank" rel="noopener">聯絡我們</a></p>
             <h2>可安裝的 Wumetax 外掛</h2>
-            <?php $catalog = $this->get_catalog(); foreach (($catalog['plugins'] ?? array()) as $item) : $install_url = wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_install&repo=' . rawurlencode($item['repository'])), 'wumetax_hub_install'); ?>
-            <div class="card" style="max-width:800px"><h3><?php echo esc_html($item['name']); ?></h3><p><?php echo esc_html($item['description']); ?></p><p><a class="button button-primary" href="<?php echo esc_url($install_url); ?>">從 GitHub 安裝／更新</a> <a class="button" target="_blank" rel="noopener" href="<?php echo esc_url('https://github.com/' . $item['repository'] . '/releases'); ?>">版本資訊</a></p></div>
+            <?php $catalog = $this->get_catalog(); foreach (($catalog['plugins'] ?? array()) as $item) : $release = $this->get_latest_release($item['repository']); $version = $release['tag_name'] ?? '尚未發佈 Release'; $install_url = wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_install&repo=' . rawurlencode($item['repository'])), 'wumetax_hub_install'); ?>
+            <div class="card" style="max-width:800px"><h3><?php echo esc_html($item['name']); ?></h3><p><?php echo esc_html($item['description']); ?></p><p><strong>最新版本：</strong><?php echo esc_html($version); ?></p><p><a class="button button-primary" href="<?php echo esc_url($install_url); ?>">從 GitHub 安裝／更新</a> <a class="button" target="_blank" rel="noopener" href="<?php echo esc_url('https://github.com/' . $item['repository'] . '/releases'); ?>">版本資訊</a></p></div>
             <?php endforeach; ?>
             <h2>已安裝的 Wumetax 外掛</h2>
             <table class="widefat striped"><thead><tr><th>外掛</th><th>版本</th><th>狀態</th><th>操作</th></tr></thead><tbody>
