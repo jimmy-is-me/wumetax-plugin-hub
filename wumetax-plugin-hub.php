@@ -17,6 +17,7 @@ final class Wumetax_Plugin_Hub {
     public function __construct() {
         add_action('admin_menu', array($this, 'register_menu'), 20);
         add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_settings_link'));
+        add_action('admin_post_wumetax_hub_install', array($this, 'install_plugin'));
     }
 
     public function register_menu() {
@@ -43,6 +44,29 @@ final class Wumetax_Plugin_Hub {
         return $plugins;
     }
 
+    private function get_catalog() {
+        $url = 'https://raw.githubusercontent.com/jimmy-is-me/wumetax-plugin-hub/main/catalog.json';
+        $cached = get_transient('wumetax_hub_catalog');
+        if ($cached !== false) return $cached;
+        $response = wp_remote_get($url, array('timeout' => 10));
+        $catalog = !is_wp_error($response) ? json_decode(wp_remote_retrieve_body($response), true) : array();
+        set_transient('wumetax_hub_catalog', $catalog, 5 * MINUTE_IN_SECONDS);
+        return $catalog;
+    }
+
+    public function install_plugin() {
+        if (!current_user_can('install_plugins')) wp_die('權限不足');
+        check_admin_referer('wumetax_hub_install');
+        $repo = sanitize_text_field($_GET['repo'] ?? '');
+        if ($repo !== 'jimmy-is-me/wumetax-webp-tools') wp_die('無效的外掛來源');
+        require_once ABSPATH . 'wp-admin/includes/class-plugin-upgrader.php';
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        $upgrader = new Plugin_Upgrader(new Automatic_Upgrader_Skin());
+        $upgrader->install('https://github.com/' . $repo . '/releases/latest/download/wumetax-webp-tools.zip');
+        wp_safe_redirect(admin_url('plugins.php'));
+        exit;
+    }
+
     public function render_marketplace() {
         if (!current_user_can('manage_options')) wp_die('權限不足');
         $plugins = $this->get_wumetax_plugins();
@@ -51,6 +75,10 @@ final class Wumetax_Plugin_Hub {
             <h1>Wumetax 外掛市集</h1>
             <p>由 Wumetax LTD 開發與維護。每個功能皆為可獨立安裝、啟用與更新的 WordPress 外掛。</p>
             <p><a class="button button-primary" href="<?php echo esc_url(admin_url('plugin-install.php?tab=upload')); ?>">上傳並安裝 Wumetax 外掛</a> <a class="button" href="https://wumetax.com/contact-us/" target="_blank" rel="noopener">聯絡我們</a></p>
+            <h2>可安裝的 Wumetax 外掛</h2>
+            <?php $catalog = $this->get_catalog(); foreach (($catalog['plugins'] ?? array()) as $item) : $install_url = wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_install&repo=' . rawurlencode($item['repository'])), 'wumetax_hub_install'); ?>
+            <div class="card" style="max-width:800px"><h3><?php echo esc_html($item['name']); ?></h3><p><?php echo esc_html($item['description']); ?></p><p><a class="button button-primary" href="<?php echo esc_url($install_url); ?>">從 GitHub 安裝／更新</a> <a class="button" target="_blank" rel="noopener" href="<?php echo esc_url('https://github.com/' . $item['repository'] . '/releases'); ?>">版本資訊</a></p></div>
+            <?php endforeach; ?>
             <h2>已安裝的 Wumetax 外掛</h2>
             <table class="widefat striped"><thead><tr><th>外掛</th><th>版本</th><th>狀態</th><th>操作</th></tr></thead><tbody>
             <?php if (empty($plugins)) : ?><tr><td colspan="4">尚未安裝其他 Wumetax 功能外掛。請使用上方按鈕安裝 ZIP。</td></tr>
