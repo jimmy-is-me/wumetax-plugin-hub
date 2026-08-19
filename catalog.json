@@ -1,3 +1,14 @@
 {
-  "plugins": []
+  "plugins": [
+    {
+      "slug": "wumetax-webp-tools",
+      "name": "Wumetax WebP Tools",
+      "plugin_file": "wumetax-webp-tools/wumetax-webp-tools.php",
+      "package_url": "https://github.com/jimmy-is-me/wumetax-webp-tools/archive/refs/heads/main.zip",
+      "version": "1.0.0",
+      "category": "WordPress",
+      "icon": "🖼️",
+      "description": "圖片自動轉 WebP、縮圖尺寸管理與縮圖重新產生。"
+    }
+  ]
 }
