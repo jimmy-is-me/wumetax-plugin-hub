@@ -1,10 +1,10 @@
 # Wumetax Plugin Hub
 
-Wumetax LTD 的 WordPress 外掛管理中心。
+Wumetax LTD 的 WordPress 外掛市集。
 
-- 手動上傳與安裝 Wumetax 功能外掛
-- 顯示已安裝外掛狀態
-- 系統資訊
-- 聯絡我們：https://wumetax.com/contact-us/
+- 卡片式市集介面
+- GitHub catalog 快取同步
+- 外掛 GitHub Release ZIP 一鍵安裝
+- 系統資訊與聯絡我們
 
-品牌：Wumetax LTD。
+未來功能外掛只要登錄於 `catalog.json`，即可自動出現在 WordPress 後台。
