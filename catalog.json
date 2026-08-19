@@ -1,10 +1,10 @@
 {
   "plugins": [
     {
-      "slug": "wumetax-webp-tools",
+      "slug": "wumetax-webp",
       "name": "Wumetax WebP Tools",
-      "plugin_file": "wumetax-webp-tools/wumetax-webp-tools.php",
-      "package_url": "https://github.com/jimmy-is-me/wumetax-webp-tools/archive/refs/heads/main.zip",
+      "plugin_file": "wumetax-webp/wumetax-webp.php",
+      "package_url": "https://github.com/jimmy-is-me/wumetax-webp/archive/refs/heads/main.zip",
       "version": "1.0.0",
       "category": "工具",
       "icon": "🖼️",
