@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    {
+      "slug": "wumetax-webp-tools",
+      "name": "Wumetax WebP Tools",
+      "repository": "jimmy-is-me/wumetax-webp-tools",
+      "plugin_file": "wumetax-webp-tools/wumetax-webp-tools.php",
+      "description": "上傳 JPEG/PNG 時自動建立 WebP 副本。"
+    }
+  ]
+}
