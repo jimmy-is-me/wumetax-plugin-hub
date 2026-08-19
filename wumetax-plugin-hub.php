@@ -1,116 +1,30 @@
 <?php
 /**
  * Plugin Name: Wumetax Plugin Hub
- * Description: Wumetax LTD 外掛市集、系統資訊與功能外掛管理中心。
- * Version: 0.1.0
+ * Description: Wumetax LTD 外掛市集、GitHub 更新與系統資訊。
+ * Version: 0.2.0
  * Author: Wumetax LTD
  * Author URI: https://wumetax.com/
  * License: GPL-2.0-or-later
- * Text Domain: wumetax-plugin-hub
  */
-
 defined('ABSPATH') || exit;
-
-define('WUMETAX_HUB_VERSION', '0.1.0');
-
 final class Wumetax_Plugin_Hub {
-    public function __construct() {
-        add_action('admin_menu', array($this, 'register_menu'), 20);
-        add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_settings_link'));
-        add_action('admin_post_wumetax_hub_install', array($this, 'install_plugin'));
-    }
-
-    public function register_menu() {
-        add_menu_page('Wumetax Plugin Hub', 'Wumetax Hub', 'manage_options', 'wumetax-plugin-hub', array($this, 'render_marketplace'), 'dashicons-screenoptions', 56);
-        add_submenu_page('wumetax-plugin-hub', '外掛市集', '外掛市集', 'manage_options', 'wumetax-plugin-hub', array($this, 'render_marketplace'));
-        add_submenu_page('wumetax-plugin-hub', '系統資訊', '系統資訊', 'manage_options', 'wumetax-system-info', array($this, 'render_system_info'));
-        add_submenu_page('wumetax-plugin-hub', '聯絡我們', '聯絡我們', 'manage_options', 'wumetax-contact', array($this, 'render_contact'));
-    }
-
-    public function add_settings_link($links) {
-        array_unshift($links, '<a href="' . esc_url(admin_url('admin.php?page=wumetax-plugin-hub')) . '">開啟 Hub</a>');
-        return $links;
-    }
-
-    private function get_wumetax_plugins() {
-        if (!function_exists('get_plugins')) require_once ABSPATH . 'wp-admin/includes/plugin.php';
-        $plugins = array();
-        foreach (get_plugins() as $file => $data) {
-            $slug = dirname($file);
-            if ($slug === 'wumetax-plugin-hub' || strpos($slug, 'wumetax-') === 0 || stripos($data['Name'], 'Wumetax') === 0) {
-                $plugins[] = array('name' => $data['Name'], 'version' => $data['Version'], 'file' => $file, 'active' => is_plugin_active($file));
-            }
-        }
-        return $plugins;
-    }
-
-    private function get_catalog() {
-        $url = 'https://raw.githubusercontent.com/jimmy-is-me/wumetax-plugin-hub/main/catalog.json';
-        $cached = get_transient('wumetax_hub_catalog');
-        if ($cached !== false) return $cached;
-        $response = wp_remote_get($url, array('timeout' => 10));
-        $catalog = !is_wp_error($response) ? json_decode(wp_remote_retrieve_body($response), true) : array();
-        set_transient('wumetax_hub_catalog', $catalog, 5 * MINUTE_IN_SECONDS);
-        return $catalog;
-    }
-
-    private function get_latest_release($repo) {
-        $key = 'wumetax_release_' . md5($repo);
-        $cached = get_transient($key);
-        if ($cached !== false) return $cached;
-        $response = wp_remote_get('https://api.github.com/repos/' . $repo . '/releases/latest', array('timeout' => 10, 'headers' => array('Accept' => 'application/vnd.github+json')));
-        $release = !is_wp_error($response) ? json_decode(wp_remote_retrieve_body($response), true) : array();
-        set_transient($key, $release, 5 * MINUTE_IN_SECONDS);
-        return $release;
-    }
-
-    public function install_plugin() {
-        if (!current_user_can('install_plugins')) wp_die('權限不足');
-        check_admin_referer('wumetax_hub_install');
-        $repo = sanitize_text_field($_GET['repo'] ?? '');
-        if ($repo !== 'jimmy-is-me/wumetax-webp-tools') wp_die('無效的外掛來源');
-        require_once ABSPATH . 'wp-admin/includes/class-plugin-upgrader.php';
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        $upgrader = new Plugin_Upgrader(new Automatic_Upgrader_Skin());
-        $upgrader->install('https://github.com/' . $repo . '/releases/latest/download/wumetax-webp-tools.zip');
-        wp_safe_redirect(admin_url('plugins.php'));
-        exit;
-    }
-
-    public function render_marketplace() {
-        if (!current_user_can('manage_options')) wp_die('權限不足');
-        $plugins = $this->get_wumetax_plugins();
-        ?>
-        <div class="wrap">
-            <h1>Wumetax 外掛市集</h1>
-            <p>由 Wumetax LTD 開發與維護。每個功能皆為可獨立安裝、啟用與更新的 WordPress 外掛。</p>
-            <p><a class="button button-primary" href="<?php echo esc_url(admin_url('plugin-install.php?tab=upload')); ?>">上傳並安裝 Wumetax 外掛</a> <a class="button" href="https://wumetax.com/contact-us/" target="_blank" rel="noopener">聯絡我們</a></p>
-            <h2>可安裝的 Wumetax 外掛</h2>
-            <?php $catalog = $this->get_catalog(); foreach (($catalog['plugins'] ?? array()) as $item) : $release = $this->get_latest_release($item['repository']); $version = $release['tag_name'] ?? '尚未發佈 Release'; $install_url = wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_install&repo=' . rawurlencode($item['repository'])), 'wumetax_hub_install'); ?>
-            <div class="card" style="max-width:800px"><h3><?php echo esc_html($item['name']); ?></h3><p><?php echo esc_html($item['description']); ?></p><p><strong>最新版本：</strong><?php echo esc_html($version); ?></p><p><a class="button button-primary" href="<?php echo esc_url($install_url); ?>">從 GitHub 安裝／更新</a> <a class="button" target="_blank" rel="noopener" href="<?php echo esc_url('https://github.com/' . $item['repository'] . '/releases'); ?>">版本資訊</a></p></div>
-            <?php endforeach; ?>
-            <h2>已安裝的 Wumetax 外掛</h2>
-            <table class="widefat striped"><thead><tr><th>外掛</th><th>版本</th><th>狀態</th><th>操作</th></tr></thead><tbody>
-            <?php if (empty($plugins)) : ?><tr><td colspan="4">尚未安裝其他 Wumetax 功能外掛。請使用上方按鈕安裝 ZIP。</td></tr>
-            <?php else : foreach ($plugins as $plugin) : ?>
-            <tr><td><?php echo esc_html($plugin['name']); ?></td><td><?php echo esc_html($plugin['version']); ?></td><td><?php echo $plugin['active'] ? '<span style="color:#00a32a">已啟用</span>' : '未啟用'; ?></td><td><a href="<?php echo esc_url(admin_url('plugins.php')); ?>">管理外掛</a></td></tr>
-            <?php endforeach; endif; ?></tbody></table>
-            <h2>即將提供</h2><p>WebP Tools 已作為第一個獨立功能外掛建立；後續會依相同結構逐步拆出維護模式、登入限制、郵件追蹤等功能。</p>
-        </div><?php
-    }
-
-    public function render_system_info() {
-        if (!current_user_can('manage_options')) wp_die('權限不足');
-        global $wpdb;
-        $theme = wp_get_theme();
-        ?>
-        <div class="wrap"><h1>系統資訊</h1><table class="widefat striped" style="max-width:800px"><tbody>
-        <tr><th>品牌</th><td>Wumetax LTD</td></tr><tr><th>WordPress</th><td><?php echo esc_html(get_bloginfo('version')); ?></td></tr><tr><th>PHP</th><td><?php echo esc_html(PHP_VERSION); ?></td></tr><tr><th>MySQL</th><td><?php echo esc_html($wpdb->db_version()); ?></td></tr><tr><th>主題</th><td><?php echo esc_html($theme->get('Name')); ?></td></tr><tr><th>記憶體上限</th><td><?php echo esc_html(ini_get('memory_limit')); ?></td></tr><tr><th>網站時區</th><td><?php echo esc_html(wp_timezone_string()); ?></td></tr></tbody></table></div><?php
-    }
-
-    public function render_contact() {
-        if (!current_user_can('manage_options')) wp_die('權限不足');
-        echo '<div class="wrap"><h1>聯絡 Wumetax LTD</h1><p>需要協助或有功能建議，請前往 <a href="https://wumetax.com/contact-us/" target="_blank" rel="noopener">Wumetax 聯絡我們</a>。</p></div>';
-    }
+ const CACHE='wumetax_hub_catalog'; const TTL=21600;
+ public function __construct(){add_action('admin_menu',[$this,'menu'],20);add_action('admin_post_wumetax_hub_action',[$this,'action']);add_action('wumetax_hub_refresh',[$this,'refresh']);add_filter('plugin_action_links_'.plugin_basename(__FILE__),[$this,'link']);}
+ public static function activate(){if(!wp_next_scheduled('wumetax_hub_refresh'))wp_schedule_event(time()+300,'twicedaily','wumetax_hub_refresh');}
+ public static function deactivate(){wp_clear_scheduled_hook('wumetax_hub_refresh');}
+ public function menu(){add_menu_page('Wumetax Plugin Hub','Wumetax Hub','manage_options','wumetax-plugin-hub',[$this,'market'],'dashicons-screenoptions',56);add_submenu_page('wumetax-plugin-hub','外掛市集','外掛市集','manage_options','wumetax-plugin-hub',[$this,'market']);add_submenu_page('wumetax-plugin-hub','系統資訊','系統資訊','manage_options','wumetax-system-info',[$this,'system']);add_submenu_page('wumetax-plugin-hub','聯絡我們','聯絡我們','manage_options','wumetax-contact',[$this,'contact']);}
+ public function link($l){array_unshift($l,'<a href="'.esc_url(admin_url('admin.php?page=wumetax-plugin-hub')).'">外掛市集</a>');return $l;}
+ public function refresh(){delete_transient(self::CACHE);$this->catalog();}
+ private function catalog(){ $c=get_transient(self::CACHE);if($c!==false)return $c;$r=wp_remote_get('https://raw.githubusercontent.com/jimmy-is-me/wumetax-plugin-hub/main/catalog.json',['timeout'=>10]);$c=!is_wp_error($r)?json_decode(wp_remote_retrieve_body($r),true):['plugins'=>[]];set_transient(self::CACHE,$c,self::TTL);return $c;}
+ private function plugins(){if(!function_exists('get_plugins'))require_once ABSPATH.'wp-admin/includes/plugin.php';return get_plugins();}
+ private function local($item){foreach($this->plugins() as $file=>$data)if(basename($file)===$item['main_file']&&strpos(dirname($file),'wumetax-')===0)return ['file'=>$file,'data'=>$data,'active'=>is_plugin_active($file)];return false;}
+ private function remote_version($item){$k='wumetax_v_'.md5($item['repository']);$v=get_transient($k);if($v!==false)return $v;$u='https://raw.githubusercontent.com/'.$item['repository'].'/main/'.$item['main_file'];$r=wp_remote_get($u,['timeout'=>10]);preg_match('/Version:\s*([^\r\n*]+)/i,!is_wp_error($r)?wp_remote_retrieve_body($r):'', $m);$v=isset($m[1])?trim($m[1]):'';set_transient($k,$v,self::TTL);return $v;}
+ private function url($item,$mode){return wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_action&mode='.$mode.'&slug='.$item['slug']),'wumetax_hub_action');}
+ public function action(){if(!current_user_can('install_plugins'))wp_die('權限不足');check_admin_referer('wumetax_hub_action');$slug=sanitize_key($_GET['slug']??'');$mode=sanitize_key($_GET['mode']??'');foreach(($this->catalog()['plugins']??[]) as $item)if($item['slug']===$slug){$local=$this->local($item);$package='https://github.com/'.$item['repository'].'/archive/refs/heads/main.zip';require_once ABSPATH.'wp-admin/includes/file.php';require_once ABSPATH.'wp-admin/includes/class-wp-upgrader.php';require_once ABSPATH.'wp-admin/includes/plugin.php';$up=new Plugin_Upgrader(new Automatic_Upgrader_Skin());if($mode==='install'&&!$local)$up->install($package);elseif($local){$t=get_site_transient('update_plugins');if(!is_object($t))$t=new stdClass();$t->response[$local['file']]=(object)['plugin'=>$local['file'],'slug'=>$slug,'new_version'=>$this->remote_version($item),'package'=>$package];set_site_transient('update_plugins',$t);$up->upgrade($local['file']);}break;}wp_safe_redirect(admin_url('admin.php?page=wumetax-plugin-hub'));exit;}
+ public function market(){if(!current_user_can('manage_options'))wp_die('權限不足');$items=$this->catalog()['plugins']??[];?>
+ <div class="wrap wh"><div class="hero"><div><h1>▰ Wumetax 外掛市集</h1><p>由 Wumetax LTD 開發與維護</p></div><div><span class="online">● 已連線</span><a class="button" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=wumetax_hub_action&mode=refresh&slug=none'),'wumetax_hub_action')); ?>">⟳ 檢查更新</a></div></div><div class="notice notice-success"><p><b>✓ Wumetax Plugin Hub 已上線</b><br>支援 GitHub 同步、市集瀏覽與一鍵安裝。</p></div><div class="filters"><button data-filter="all">全部</button><button data-filter="WordPress">WordPress</button><input id="search" placeholder="⌕ 搜尋外掛…"></div><div class="grid"><?php foreach($items as $i):$l=$this->local($i);$rv=$this->remote_version($i);$update=$l&&$rv&&version_compare($rv,$l['data']['Version'],'>');?><div class="card" data-cat="<?php echo esc_attr($i['category']); ?>"><div class="icon"><?php echo $i['icon']; ?></div><h2><?php echo esc_html($i['name']); ?></h2><span class="tag"><?php echo esc_html($i['category']); ?></span><span class="ver">v<?php echo esc_html($rv?:'—'); ?></span><p><?php echo esc_html($i['description']); ?></p><footer><?php if(!$l):?><a class="button button-primary" href="<?php echo esc_url($this->url($i,'install')); ?>">安裝</a><?php elseif($update):?><a class="button button-primary" href="<?php echo esc_url($this->url($i,'update')); ?>">更新</a><?php else:?><b>已安裝<?php echo $l['active']?' · 已啟用':''; ?></b><?php endif;?></footer></div><?php endforeach;?></div></div><style>.wh{max-width:1400px}.hero{background:#9cb6c7;color:#fff;border-radius:14px;padding:26px 38px;display:flex;justify-content:space-between;align-items:center}.hero h1{color:#fff;margin:0}.hero p{margin:6px 0 0}.online{background:#fff;color:#4c9b76;border-radius:22px;padding:10px 16px;margin-right:12px}.filters{margin:25px 0;display:flex;gap:10px}.filters button,.filters input{border:1px solid #d8e0e6;background:#fff;border-radius:22px;padding:9px 18px}.filters input{margin-left:auto;width:250px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}.card{background:#fff;border:1px solid #e1e7eb;border-radius:10px;padding:24px;min-height:235px;position:relative}.icon{font-size:32px;float:left;margin-right:15px}.card h2{font-size:18px;margin:8px 0 16px}.tag{background:#edf3f6;padding:5px 10px;border-radius:16px;color:#668399}.ver{margin-left:8px;color:#778}.card p{clear:both;color:#66788a;line-height:1.7}.card footer{position:absolute;bottom:20px;right:22px}.card footer b{color:#4c9b76}</style><script>document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>document.querySelectorAll('.card').forEach(c=>c.style.display=b.dataset.filter==='all'||c.dataset.filter===b.dataset.filter?'block':'none'));document.querySelector('#search').oninput=e=>document.querySelectorAll('.card').forEach(c=>c.style.display=c.innerText.toLowerCase().includes(e.target.value.toLowerCase())?'block':'none');</script><?php }
+ public function system(){global $wpdb;$t=wp_get_theme();echo '<div class="wrap"><h1>系統資訊</h1><table class="widefat striped"><tr><th>品牌</th><td>Wumetax LTD</td></tr><tr><th>WordPress</th><td>'.esc_html(get_bloginfo('version')).'</td></tr><tr><th>PHP</th><td>'.esc_html(PHP_VERSION).'</td></tr><tr><th>MySQL</th><td>'.esc_html($wpdb->db_version()).'</td></tr><tr><th>主題</th><td>'.esc_html($t->get('Name')).'</td></tr></table></div>';}
+ public function contact(){echo '<div class="wrap"><h1>聯絡 Wumetax LTD</h1><p><a class="button button-primary" target="_blank" rel="noopener" href="https://wumetax.com/contact-us/">前往聯絡我們</a></p></div>';}
 }
-new Wumetax_Plugin_Hub();
+register_activation_hook(__FILE__,['Wumetax_Plugin_Hub','activate']);register_deactivation_hook(__FILE__,['Wumetax_Plugin_Hub','deactivate']);new Wumetax_Plugin_Hub();
